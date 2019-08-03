@@ -8,7 +8,7 @@
 
 import UIKit
 
-class PhotosCollectionViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
+class PhotosCollectionViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UICollectionViewDelegate {
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -60,6 +60,14 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
         return UIEdgeInsets(top: 0, left: 10.0, bottom: 0, right: 10.0)
     }
     
+    func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        let photoReference = photoReferences[indexPath.item]
+
+        operations[photoReference.id]?.cancel()
+        print("cancelling operations")
+        
+    }
+    
     // MARK: - Private
     
     private func loadImage(forCell cell: ImageCollectionViewCell, forItemAt indexPath: IndexPath) {
@@ -67,21 +75,51 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
         let photoReference = photoReferences[indexPath.item]
         
         // TODO: Implement image loading here
-        let request = URLRequest(url: photoReference.imageURL.usingHTTPS!)
-            //request.httpMethod = "GET"
         
-            if let cachedValue = cache.value(for: photoReference.id) {
-                let image = UIImage(data: cachedValue)
-                cell.imageView.image = image
+        let fetchPhotoOperation = FetchPhotoOperation(marsPhotoReference: photoReference)
+        
+        let cachedOperation = BlockOperation {
+            if let data = fetchPhotoOperation.imageData {
+                self.cache.cache(value: data, for: photoReference.id)
             }
-
+        }
         
-            URLSession.shared.dataTask(with: request) { (data, _, error) in
+        let checkReuseOperation = BlockOperation {
+            if let currentIndexPath = self.collectionView.indexPath(for: cell) {
+                if currentIndexPath != indexPath {
+                    return
+                } else {
+                    if let data = fetchPhotoOperation.imageData {
+                        let image = UIImage(data: data)
+                        cell.imageView.image = image
+                    }
+                }
+            }
+        }
+        
+        cachedOperation.addDependency(fetchPhotoOperation)
+        checkReuseOperation.addDependency(fetchPhotoOperation)
+        
+        photoFetchQueue.addOperation(fetchPhotoOperation)
+        photoFetchQueue.addOperation(cachedOperation)
+        OperationQueue.main.addOperation(checkReuseOperation)
+        
+        self.operations[photoReference.id] = fetchPhotoOperation
+    
+    }
+        /* //rewriting this part using Operations
+         if let cachedValue = cache.value(for: photoReference.id) {
+         let image = UIImage(data: cachedValue)
+         cell.imageView.image = image
+         } else {
+        let request = URLRequest(url: photoReference.imageURL.usingHTTPS!)
+         
+             URLSession.shared.dataTask(with: request) { (data, _, error) in
                 if let error = error {
                     NSLog("there is an error in getting an image: \(error)")
                     return
                 }
-                
+         
                 guard let data = data else {
                     NSLog("there is an error in getting a data")
                     return
@@ -95,18 +133,19 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
                     cell.imageView.image = image
                 }
             }.resume()
-        }
-
+         }
+     
+ */
     // Properties
     
     var cache = Cache<Int, Data>()
-    
     private let client = MarsRoverClient()
-    
+    private let photoFetchQueue = OperationQueue()
+    private var operations = [Int : Operation]()
     
     private var roverInfo: MarsRover? {
         didSet {
-            solDescription = roverInfo?.solDescriptions[3]
+            solDescription = roverInfo?.solDescriptions[10]
         }
     }
     private var solDescription: SolDescription? {

@@ -13,7 +13,7 @@ class Cache<Key: Hashable, Value> {
     private var cachedDatas: [Key: Value] = [:]
 
     func cache(value: Value, for key: Key) {
-        queue.sync {
+        queue.async {
             self.cachedDatas[key] = value
         }
     }
