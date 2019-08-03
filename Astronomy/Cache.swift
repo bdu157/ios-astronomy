@@ -19,7 +19,7 @@ class Cache<Key: Hashable, Value> {
     }
     
     func value(for key: Key) -> Value? {
-return queue.sync {self.cachedDatas[key]}
+        return queue.sync {self.cachedDatas[key]}
     }
     
     private let queue = DispatchQueue(label: "cache serial queue")

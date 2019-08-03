@@ -85,16 +85,18 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
         }
         
         let checkReuseOperation = BlockOperation {
-            if let currentIndexPath = self.collectionView.indexPath(for: cell) {
-                if currentIndexPath != indexPath {
+            
+            defer {self.operations.removeValue(forKey: photoReference.id)}
+        
+            if let currentIndexPath = self.collectionView?.indexPath(for: cell),
+                currentIndexPath != indexPath {
                     return
                 } else {
-                    if let data = fetchPhotoOperation.imageData {
-                        let image = UIImage(data: data)
-                        cell.imageView.image = image
+                        if let data = fetchPhotoOperation.imageData {
+                            let image = UIImage(data: data)
+                            cell.imageView.image = image
                     }
                 }
-            }
         }
         
         cachedOperation.addDependency(fetchPhotoOperation)
@@ -145,7 +147,7 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
     
     private var roverInfo: MarsRover? {
         didSet {
-            solDescription = roverInfo?.solDescriptions[10]
+            solDescription = roverInfo?.solDescriptions[3]
         }
     }
     private var solDescription: SolDescription? {
